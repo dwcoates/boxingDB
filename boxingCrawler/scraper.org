@@ -1,0 +1,8 @@
+* process
+  - 10 crawlers, one for each of the major weight classes
+  - each initiates with top boxer of the weight class, all time
+  - grabs all of fighters fights, including the urls for the opponents, which should have a unique component
+  - unique url component is used to index fighters, if this id already exists in boxingDB, dont follow the link, otherwise execute previous process for that fighter
+    - store it in a dict when crawling. No reason to constantly update a db, though have to be sure that in the event of 404s, it's handled gracefully.
+
+  - what happens when a boxer doesn't have a record? needs to not crap out spider
