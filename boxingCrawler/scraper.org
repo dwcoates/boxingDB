@@ -6,3 +6,4 @@
     - store it in a dict when crawling. No reason to constantly update a db, though have to be sure that in the event of 404s, it's handled gracefully.
 
   - what happens when a boxer doesn't have a record? needs to not crap out spider
+  - dont forget to scrape fight URL. Fights have urls with more info like scorecardss and judges
