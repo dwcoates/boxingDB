@@ -1,4 +1,4 @@
-from scrapy import Spider
+from scrapy.spiders import CrawlSpider, Rule
 from scrapy.selector import Selector
 
 import requests
