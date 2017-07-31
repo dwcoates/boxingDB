@@ -1,4 +1,5 @@
 from scrapy.spiders import CrawlSpider, Rule
+from scrapy.linkextractors import LinkExtractor
 from scrapy.selector import Selector
 
 import requests
@@ -35,34 +36,38 @@ class RandomSpider(CrawlSpider):
     rules = (
         # follow a fighters opponents
         # check regexp and link
-        Rule(LinkExtractor(allow=('//bo[0-9]+'), restrict_xpaths='//*[@id="person_bout_history"]/div[6]/div/div/table/tbody'),
-                 callback=parse_boxer, follow=True)
+        Rule(LinkExtractor(allow=(boxer_url+'/[0-9]+'),
+                               #restrict_xpaths='//*[@id="person_bout_history"]/div[6]/div/div/table/tbody'
+                               ),
+                               callback="parse_boxer",
+                 follow=True),
         )
 
     # should this be somewhere else?
     expected_ftable_dim=11
     ftable_failure_threshold=0.005 # 0.5%
 
-    def __init__(self):
-        pass
+    def __init__(self, *a, **kw):
+        super(RandomSpider, self).__init__(*a, **kw)
 
     def parse_boxer(self, response):
         # print status every 100 boxers
-        if sum(state.boxers.values()) % 100 == 0:
+        if sum(self.state["boxers"].values()) % 100 == 0:
             self.print_state()
+
+        boxer_id = RandomSpider.grab_boxer_id(response.url) # unique id for boxer from URL
 
         # popular name, not birth name
         name=response.xpath(
-                '//*[@id="homeContent"]/div[1]/div/div[2]/div[4]/div[1]/h1/text()')
+                '//*[@id="homeContent"]/div[1]/div/div[2]/div[4]/div[1]/h1/text()').extract()
         # dob, stance, height, weightclass, etc
-        stats=response.xpath('//*[@id="bo'+ boxer_id + '"]/div[2]/table/tr')
+        stats=response.xpath('//*[@id="bo'+ boxer_id + '"]/div[2]/table/tr').extract()
         # complete professional boxing record
         fights=response.xpath(
-            '//*[@id="person_bout_history"]/div[6]/div/div/table/tbody')
+            '//*[@id="person_bout_history"]/div[6]/div/div/table/tbody').extract()
 
 
         boxer_name = name.strip()
-        boxer_id = grab_boxer_id(response.url) # unique id for boxer from URL
         boxer_stats=[]
         boxer_fights=[]
 
@@ -103,16 +108,16 @@ class RandomSpider(CrawlSpider):
         self.state['boxers']["some weightclass"] = self.state['boxers'].get("some wc", 0) + 1
 
         # yield all of boxer's info scraped from profile page
-        yield {"id" : boxer_id
+        yield {"id" : boxer_id,
                "name" : boxer_name,
                "stats" : boxer_stats,
                "fights" : boxer_fights}
 
-    @static
+    @staticmethod
     def grab_boxer_id(url):
             return url[url.rfind('/')+1:]
 
-
+    @staticmethod
     def process_links(self, links):
         """Used in rule for extracting opponents from fighters boxrec page.  Don't
         include duplicate fighters, don't include fighters already seen.
