@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger()
 logging.basicConfig(filename='spider_log', level=logging.WARNING)
 
-class RandomSpider(Spider):
+class RandomSpider(CrawlSpider):
     """Novel stochastic approach to scraping all of the boxers. Start at prominant
     fighter, propogate recursively across his set of opponents. Assume
     relevant boxing world can be described with a single undirected
@@ -32,6 +32,13 @@ class RandomSpider(Spider):
         "ftable dim errors" : 0, # unexpected fight table dimension count
         }
 
+    rules = (
+        # follow a fighters opponents
+        # check regexp and link
+        Rule(LinkExtractor(allow=('//bo[0-9]+'), restrict_xpaths='//*[@id="person_bout_history"]/div[6]/div/div/table/tbody'),
+                 callback=parse_boxer, follow=True)
+        )
+
     # should this be somewhere else?
     expected_ftable_dim=11
     ftable_failure_threshold=0.005 # 0.5%
@@ -39,10 +46,7 @@ class RandomSpider(Spider):
     def __init__(self):
         pass
 
-    def parse(self, response):
-        def grab_boxer_id(url):
-            return url[url.rfind('/')+1:]
-
+    def parse_boxer(self, response):
         # print status every 100 boxers
         if sum(state.boxers.values()) % 100 == 0:
             self.print_state()
@@ -94,31 +98,46 @@ class RandomSpider(Spider):
                 # fight[10] = ?
                 pass
 
+        # update state after successfully yielding the boxer to database
+        # 'some weightclass' comes from boxer_stats
+        self.state['boxers']["some weightclass"] = self.state['boxers'].get("some wc", 0) + 1
+
         # yield all of boxer's info scraped from profile page
         yield {"id" : boxer_id
                "name" : boxer_name,
                "stats" : boxer_stats,
                "fights" : boxer_fights}
 
-        # update state after successfully yielding the boxer to database
-        # 'some weightclass' comes from boxer_stats
-        self.state['boxers']["some weightclass"] = self.state['boxers'].get("some wc", 0) + 1
+    @static
+    def grab_boxer_id(url):
+            return url[url.rfind('/')+1:]
 
-        database=None # fixme
-        num_closures=0
-        # recurse spider across opponents
-        for fight in boxer_fights
-            fid = fight["opponent_id"]
-            if fid not in database:
-                closures += 1
-                yield scrapy.Request(boxer_url+"/"+fid, callback=self.parse)
-            else:
-                self.state["closures"] += 1 # record that we've found a fighter we've seen
 
-        # record when a fighter has no unseen opponents
-        # this means we've bottomed out on this depth-first traversal
-        if num_closures = len(boxer_fights):
-            self.state["total closures"] += 1
+    def process_links(self, links):
+        """Used in rule for extracting opponents from fighters boxrec page.  Don't
+        include duplicate fighters, don't include fighters already seen.
+        """
+        database=[]
+
+        # database=None # fixme
+        # num_closures=0
+        # # recurse spider across opponents
+        # for fight in boxer_fights
+        #     fid = fight["opponent_id"]
+        #     if fid not in database:
+        #         closures += 1
+        #         yield scrapy.Request(boxer_url+"/"+fid, callback=self.parse)
+        #     else:
+        #         self.state["closures"] += 1 # record that we've found a fighter we've seen
+
+        # # record when a fighter has no unseen opponents
+        # # this means we've bottomed out on this depth-first traversal
+        # if num_closures = len(boxer_fights):
+        #     self.state["total closures"] += 1
+
+        return [link for link in set(links) if link in database]
+
+
 
     def print_state(self):
         # print number closures, boxers, errors, etc
